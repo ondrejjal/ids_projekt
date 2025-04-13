@@ -90,16 +90,22 @@ INSERT INTO Users (username, fname, lname, password, email, phone_number, street
 VALUES ('reader1', 'John', 'Cena', 'kjcdIDJBVDFJNB749KJDjnanvjshbdGUY768', 'r1@example.com', '123456789', 'Veveri 4', 'Brno', '12345', 'Reader', NULL, TO_DATE('2023-01-10', 'YYYY-MM-DD') );
 
 INSERT INTO Users (username, fname, lname, password, email, phone_number, street, city, PIN, user_role, staff_position, registration_date)
-VALUES ('staff1', 'Sun', 'Tzu', 'kasjdvnJNDVIN8976GCEUYAGbfu66FADVHuyf', 's1@example.com', '987654321', 'Vystaviste 15', 'Prague', '54321', 'Staff', 'Librarian', NULL);
+VALUES ('is_calling', 'John', 'Pork', 'lajskldjfrklajeklajkljkqwjrioqw1231k', 'porky@example.com', '800851321', 'Veveri 5', 'Brno', '12345', 'Reader', NULL, TO_DATE('2023-01-11', 'YYYY-MM-DD') );
 
 INSERT INTO Users (username, fname, lname, password, email, phone_number, street, city, PIN, user_role, staff_position, registration_date)
 VALUES ('reader2', 'Arnold', 'Schwarzenegger', 'YVhbvgyvGGYcfyvYctfyv6rjhsb&*%7675cd', 'r2@example.com', '111222333', 'Delnicka 21', 'Ostrava', '11223', 'Reader', NULL, TO_DATE('2023-02-01', 'YYYY-MM-DD') );
+
+INSERT INTO Users (username, fname, lname, password, email, phone_number, street, city, PIN, user_role, staff_position, registration_date)
+VALUES ('staff1', 'Sun', 'Tzu', 'kasjdvnJNDVIN8976GCEUYAGbfu66FADVHuyf', 's1@example.com', '987654321', 'Vystaviste 15', 'Prague', '54321', 'Staff', 'Librarian', NULL);
 
 INSERT INTO Title_table (title_name, first_release, genre, title_type, author, category, language_of_origin, sequence_number, piece_name)
 VALUES ('SQL Basics', TO_DATE('2020-01-01', 'YYYY-MM-DD'), 'Education', 'Book', 'John Doe', 'Scientific', 'English', NULL, NULL);
 
 INSERT INTO Title_table (title_name, first_release, genre, title_type, author, category, language_of_origin, sequence_number, piece_name)
 VALUES ('Tech Today', TO_DATE('2021-06-15', 'YYYY-MM-DD'), 'Technology', 'Magazine', NULL, NULL, NULL, 2, 'Issue 42');
+
+INSERT INTO Title_table (title_name, first_release, genre, title_type, author, category, language_of_origin, sequence_number, piece_name)
+VALUES ('Advanced SQL', TO_DATE('2019-05-10', 'YYYY-MM-DD'), 'Education', 'Book', 'Jane Smith', 'Scientific', 'English', NULL, NULL);
 
 INSERT INTO Reservations (time_of_reservation, title_id, user_id)
 VALUES (TO_TIMESTAMP('2023-10-3/14:20:12', 'yyyy-mm-dd/hh24:mi:ss'), 1, 1);
@@ -113,8 +119,17 @@ VALUES ('1234-5678', 'English', 'Magazine Publisher Inc.', TO_DATE('2021-06-20',
 INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
 VALUES ('1343-3942', 'English', 'Super Publisher Inc.', TO_DATE('2022-09-20', 'YYYY-MM-DD'), 1);
 
+INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
+VALUES ('5678-1234', 'English', 'Educational Books Inc.', TO_DATE('2019-05-15', 'YYYY-MM-DD'), 3);
+
 INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
 VALUES (TO_DATE('2023-03-10', 'YYYY-MM-DD') , TO_DATE('2023-03-20', 'YYYY-MM-DD') , 'No', 341, 1, '1234-5678');
+
+INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
+VALUES (TO_DATE('2023-03-11', 'YYYY-MM-DD') , TO_DATE('2023-03-21', 'YYYY-MM-DD') , 'No', 600, 2, '1343-3942');
+
+INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
+VALUES (TO_DATE('2023-03-11', 'YYYY-MM-DD') , TO_DATE('2023-03-21', 'YYYY-MM-DD') , 'No', 350, 2, '5678-1234');
 
 INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
 VALUES (TO_DATE('2023-04-10', 'YYYY-MM-DD') , TO_DATE('2023-04-20', 'YYYY-MM-DD') , 'Yes', 35, 1, '1343-3942');
@@ -137,17 +152,17 @@ JOIN Loans l ON l.user_id = u.user_id
 JOIN Copies_table c ON l.issn = c.issn;
 
 ---GROUP BY - COUNT HOW MUCH FEES A PERSON HAS
-SELECT u.fname, SUM(l.fees) AS fees_sum
+SELECT u.fname, u.lname, SUM(l.fees) AS fees_sum
 FROM Users u
 JOIN Loans l ON l.user_id = u.user_id
-GROUP BY u.fname;
+GROUP BY u.user_id, u.fname, u.lname;
 
 ---GROUP BY - HOW MANY ACTIVE LOANS A PERSON HAS
-SELECT u.fname, COUNT(l.loan_id) AS active_loans
+SELECT u.fname, u.lname, COUNT(l.loan_id) AS active_loans
 FROM Users u
 JOIN Loans l ON l.user_id = u.user_id
 WHERE l.is_returned = 'No'
-GROUP BY u.fname;
+GROUP BY u.user_id, u.fname, u.lname;
 
 ---EXISTS - USERS WHO HAVE AT LEAST ONE ACTIVE LOAN
 SELECT username, fname, lname
