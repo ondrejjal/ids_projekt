@@ -235,6 +235,47 @@ SELECT * FROM Loans
 WHERE loan_id = 5;
 
 
+--- STORED PROCEDURE 1
+--- Loops through each users fees, calculates them and prints them
+CREATE OR REPLACE PROCEDURE proc_list_user_fees IS
+    user_record Users%ROWTYPE;
+    CURSOR user_cursor IS
+        SELECT * FROM Users;
+    total_fees NUMBER;
+BEGIN
+    --- Open cursor and loop through each user
+    OPEN user_cursor;
+    LOOP
+        FETCH user_cursor INTO user_record;
+        EXIT WHEN user_cursor%NOTFOUND;
+
+        --- For the current user, calculate the total fees from Loans
+        SELECT NVL(SUM(fees), 0)
+        INTO total_fees
+        FROM Loans
+        WHERE user_id = user_record.user_id;
+
+        --- Print the result
+        DBMS_OUTPUT.PUT_LINE(
+            'User: ' || user_record.fname || ' ' || user_record.lname || ' | Total fees: ' || total_fees
+        );
+
+    END LOOP;
+
+    --- Close cursor
+    CLOSE user_cursor;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
+
+END;
+/
+
+--- Execute the procerure
+EXEC proc_list_user_fees;
+
+
 --- EXPLAIN PLAN
 EXPLAIN PLAN FOR
 SELECT u.fname, u.lname, SUM(l.fees) AS fees_sum
