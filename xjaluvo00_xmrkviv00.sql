@@ -1,7 +1,6 @@
 -- Authors: xmrkviv00, xjaluvo00
 -- Assignment no. 21: Knihovna 1 
 
-
 ---DROPING TABLES
 DROP TABLE Reservations;
 DROP TABLE Loans;
@@ -84,7 +83,6 @@ CREATE TABLE Loans (
     CONSTRAINT FK_Loans_copy_id FOREIGN KEY (issn) REFERENCES Copies_table ON DELETE CASCADE
 );
 
-
 ---INSERTING DATA
 INSERT INTO Users (username, fname, lname, password, email, phone_number, street, city, PIN, user_role, staff_position, registration_date)
 VALUES ('reader1', 'John', 'Cena', 'kjcdIDJBVDFJNB749KJDjnanvjshbdGUY768', 'r1@example.com', '123456789', 'Veveri 4', 'Brno', '12345', 'Reader', NULL, TO_DATE('2023-01-10', 'YYYY-MM-DD') );
@@ -123,13 +121,13 @@ INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, t
 VALUES ('5678-1234', 'English', 'Educational Books Inc.', TO_DATE('2019-05-15', 'YYYY-MM-DD'), 3);
 
 INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
-VALUES (TO_DATE('2023-03-10', 'YYYY-MM-DD') , TO_DATE('2023-03-20', 'YYYY-MM-DD') , 'No', 341, 1, '1234-5678');
+VALUES (TO_DATE('2023-03-10', 'YYYY-MM-DD') , TO_DATE('2023-03-20', 'YYYY-MM-DD') , 'Yes', 341, 1, '1234-5678');
 
-INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
-VALUES (TO_DATE('2023-03-11', 'YYYY-MM-DD') , TO_DATE('2023-03-21', 'YYYY-MM-DD') , 'No', 600, 2, '1343-3942');
+INSERT INTO Loans (start_date, is_returned, fees, user_id, issn)
+VALUES (TO_DATE('2023-03-11', 'YYYY-MM-DD'), 'No', 600, 2, '1343-3942');
 
-INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
-VALUES (TO_DATE('2023-03-11', 'YYYY-MM-DD') , TO_DATE('2023-03-21', 'YYYY-MM-DD') , 'No', 350, 2, '5678-1234');
+INSERT INTO Loans (start_date, is_returned, fees, user_id, issn)
+VALUES (TO_DATE('2025-04-30', 'YYYY-MM-DD') , 'No', 0, 2, '5678-1234');
 
 INSERT INTO Loans (start_date, return_date, is_returned, fees, user_id, issn)
 VALUES (TO_DATE('2023-04-10', 'YYYY-MM-DD') , TO_DATE('2023-04-20', 'YYYY-MM-DD') , 'Yes', 35, 1, '1343-3942');
@@ -180,4 +178,110 @@ WHERE t.title_id IN (
     SELECT c.title_id
     FROM Copies_table c
 );
+
+
+--- PART 4
+--- TRIGGER 1 WITH EXAMPLE
+--- When a registration date is not set manualy for readers, it is set automatically to the current system time.
+CREATE OR REPLACE TRIGGER trg_registration_date
+BEFORE INSERT ON Users
+FOR EACH ROW
+BEGIN
+    IF :NEW.user_role = 'Reader' THEN
+        IF :NEW.registration_date IS NULL THEN
+            :NEW.registration_date := SYSDATE;
+        END IF;
+    END IF;
+END;
+/
+
+--- In this example, you should see the registration date update automatically based on the current date
+INSERT INTO Users (username, fname, lname, password, email, phone_number, street, city, PIN, user_role, staff_position)
+VALUES ('borec123', 'Bomabrdino', 'Crocodilo', 'oiabvdasnhukrbfvajdiuf37465iajviasd', 'tralala@example.com', '800851321', 'Veveri 5', 'Brno', '12345', 'Reader', NULL);
+
+SELECT * FROM USERS
+WHERE username = 'borec123';
+
+
+--- TRIGGER 2 WITH EXAMPLE
+--- Automatically set fees (10 units per day), based on return date.
+CREATE OR REPLACE TRIGGER trg_automatically_increase_fees
+BEFORE UPDATE ON Loans
+FOR EACH ROW
+DECLARE 
+    days_overdue NUMBER;
+BEGIN
+    IF (:OLD.is_returned = 'No' AND :NEW.is_returned = 'Yes') THEN
+        IF :NEW.return_date IS NOT NULL THEN
+            days_overdue := GREATEST(:NEW.return_date - :OLD.start_date - 14, 0);
+            :NEW.fees := days_overdue * 10;
+        END IF;
+    END IF;    
+END;
+/
+
+--- In this example, you will see the fees automaticaly increment from 0 to 60 when a return date and is_returned is updated
+INSERT INTO Loans (start_date, is_returned, fees, user_id, issn)
+VALUES (TO_DATE('2023-04-10', 'YYYY-MM-DD'), 'No', 0, 1, '1343-3942');
+
+SELECT * FROM Loans
+WHERE loan_id = 5;
+
+UPDATE Loans
+SET return_date = TO_DATE('2023-04-30', 'YYYY-MM-DD'), is_returned = 'Yes'
+WHERE loan_id = 5;
+
+SELECT * FROM Loans
+WHERE loan_id = 5;
+
+
+--- EXPLAIN PLAN
+EXPLAIN PLAN FOR
+SELECT u.fname, u.lname, SUM(l.fees) AS fees_sum
+FROM Users u
+JOIN Loans l ON l.user_id = u.user_id
+GROUP BY u.user_id, u.fname, u.lname;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+--- EXPLAIN PLAN WITH INDEX
+CREATE INDEX idx_loans_user_id ON Loans(user_id);
+
+EXPLAIN PLAN FOR
+SELECT u.fname, u.lname, SUM(l.fees) AS fees_sum
+FROM Users u
+JOIN Loans l ON l.user_id = u.user_id
+GROUP BY u.user_id, u.fname, u.lname;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+
+--- TEAMMATE ACCESS
+GRANT SELECT, INSERT, UPDATE ON Users TO xmrkviv00;
+GRANT SELECT, INSERT, UPDATE ON Title_table TO xmrkviv00;
+GRANT SELECT, INSERT, UPDATE ON Reservations TO xmrkviv00;
+GRANT SELECT, INSERT, UPDATE ON Copies_table TO xmrkviv00;
+GRANT SELECT, INSERT, UPDATE ON Loans TO xmrkviv00;
+
+
+--- COMPLEX SELECT (WITH + CASE)
+-- Show each user's loan status in plain words
+WITH loan_info AS (
+    SELECT u.user_id, u.fname, u.lname, l.loan_id, l.start_date, l.return_date, l.is_returned, l.fees
+    FROM Users u
+    JOIN Loans l ON u.user_id = l.user_id
+)
+SELECT 
+    fname,
+    lname,
+    loan_id,
+    CASE 
+        WHEN is_returned = 'Yes' THEN 'Returned'
+        WHEN return_date IS NULL AND SYSDATE > start_date + 14 THEN 'Overdue'
+        ELSE 'Active'
+    END AS loan_status,
+    fees
+FROM loan_info
+ORDER BY fname, lname, loan_id;
+
 --------------------------------END OF FILE ----------------------------------------------------------
