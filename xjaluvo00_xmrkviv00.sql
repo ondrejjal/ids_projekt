@@ -298,6 +298,15 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Check that title exists
+    SELECT COUNT(*) INTO title_id_count
+    FROM Title_table
+    WHERE title_id = p_title_id;
+    IF title_id_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: Title does not exist.');
+        RETURN;
+    END IF;
+
     -- Check that user has reservation
     SELECT COUNT(*) INTO user_id_count
     FROM Reservations
@@ -305,15 +314,6 @@ BEGIN
     AND title_id = p_title_id;
     IF user_id_count = 0 THEN
         DBMS_OUTPUT.PUT_LINE('ERROR: User does not have a reservation for this title.');
-        RETURN;
-    END IF;
-
-    -- Check that title exists
-    SELECT COUNT(*) INTO title_id_count
-    FROM Title_table
-    WHERE title_id = p_title_id;
-    IF title_id_count = 0 THEN
-        DBMS_OUTPUT.PUT_LINE('ERROR: Title does not exist.');
         RETURN;
     END IF;
 
