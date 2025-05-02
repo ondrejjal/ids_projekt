@@ -1,3 +1,6 @@
+-- Authors: xmrkviv00, xjaluvo00
+-- Assignment no. 21: Knihovna 1 
+-- Part 4
 DROP MATERIALIZED VIEW mat_immediate;
 DROP MATERIALIZED VIEW mat_deferred;
 
