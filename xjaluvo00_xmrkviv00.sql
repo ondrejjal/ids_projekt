@@ -67,8 +67,7 @@ CREATE TABLE Copies_table (
     release_date DATE,
     title_id INTEGER,
     CONSTRAINT PK_copies PRIMARY KEY (issn),
-    CONSTRAINT FK_Copies_title_id FOREIGN KEY (title_id) REFERENCES Title_table ON DELETE CASCADE
-);
+    CONSTRAINT FK_Copies_title_id FOREIGN KEY (title_id) REFERENCES Title_table ON DELETE CASCADE);
 
 CREATE TABLE Loans (
     loan_id INTEGER GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
@@ -111,11 +110,17 @@ VALUES (TO_TIMESTAMP('2023-10-3/14:20:12', 'yyyy-mm-dd/hh24:mi:ss'), 1, 1);
 INSERT INTO Reservations (time_of_reservation, title_id, user_id)
 VALUES (TO_TIMESTAMP('2023-10-2/18:30:12', 'yyyy-mm-dd/hh24:mi:ss'), 2, 3);
 
+INSERT INTO Reservations (time_of_reservation, title_id, user_id)
+VALUES (TO_TIMESTAMP('2023-10-2/18:30:12', 'yyyy-mm-dd/hh24:mi:ss'), 3, 3);
+
 INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
 VALUES ('1234-5678', 'English', 'Magazine Publisher Inc.', TO_DATE('2021-06-20', 'YYYY-MM-DD'), 2);
 
 INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
 VALUES ('1343-3942', 'English', 'Super Publisher Inc.', TO_DATE('2022-09-20', 'YYYY-MM-DD'), 1);
+
+INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
+VALUES ('1343-3944', 'English', 'Super Publisher Inc.', TO_DATE('2022-09-20', 'YYYY-MM-DD'), 1);
 
 INSERT INTO Copies_table (issn, copy_language, publishing_house, release_date, title_id)
 VALUES ('5678-1234', 'English', 'Educational Books Inc.', TO_DATE('2019-05-15', 'YYYY-MM-DD'), 3);
@@ -272,8 +277,106 @@ EXCEPTION
 END;
 /
 
---- Execute the procerure
+CREATE OR REPLACE PROCEDURE user_loan_book(
+    p_user_id IN Users.user_id%TYPE,
+    p_title_id IN Title_table.title_id%TYPE
+) IS
+    available_copies INTEGER;
+    title_id_count INTEGER;
+    user_id_count INTEGER;
+    available_copy_id Copies_table.issn%TYPE;
+    earlier_reservations INTEGER;
+
+BEGIN
+    -- Check that user exists
+    SELECT COUNT(*) INTO user_id_count
+    FROM Users
+    WHERE user_id = p_user_id;
+
+    IF user_id_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: User does not exist.');
+        RETURN;
+    END IF;
+
+    -- Check that user has reservation
+    SELECT COUNT(*) INTO user_id_count
+    FROM Reservations
+    WHERE user_id = p_user_id
+    AND title_id = p_title_id;
+    IF user_id_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: User does not have a reservation for this title.');
+        RETURN;
+    END IF;
+
+    -- Check that title exists
+    SELECT COUNT(*) INTO title_id_count
+    FROM Title_table
+    WHERE title_id = p_title_id;
+    IF title_id_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: Title does not exist.');
+        RETURN;
+    END IF;
+
+    -- Count how many users reserved this title before the current user
+    SELECT COUNT(*) INTO earlier_reservations
+    FROM Reservations Fr 
+    WHERE Fr.title_id = p_title_id
+    AND Fr.user_id != p_user_id
+    AND Fr.time_of_reservation < (
+        SELECT Sr.time_of_reservation
+        FROM Reservations Sr 
+        WHERE Sr.title_id = p_title_id
+        AND Sr.user_id = p_user_id
+    );
+    -- Count available copies (not currently loaned)
+    SELECT COUNT(*) INTO available_copies
+    FROM Copies_table Fc
+    WHERE Fc.title_id = p_title_id
+    AND NOT EXISTS (
+        SELECT 1
+        FROM Loans Fl
+        WHERE Fl.issn = Fc.issn
+        AND Fl.is_returned = 'No'
+    );
+    -- Check if copies are available for this reservation slot
+    IF available_copies <= earlier_reservations THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: No available copies.');
+        RETURN;
+    END IF;
+
+    -- Find one available copy
+    SELECT Fc.issn INTO available_copy_id
+    FROM Copies_table Fc
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM Loans Fl
+        WHERE Fl.issn = Fc.issn
+        AND Fl.is_returned = 'No'
+    )
+    AND ROWNUM = 1;
+
+    -- Create the loan
+    INSERT INTO Loans (start_date, is_returned, fees, user_id, issn)
+    VALUES (SYSDATE, 'No', 0, p_user_id, available_copy_id);
+
+    DBMS_OUTPUT.PUT_LINE('Loan created successfully for user ID ' || p_user_id || ' with copy ISSN ' || available_copy_id);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
+
+END;
+/
+--- Execute the procerure 1
 EXEC proc_list_user_fees;
+--- Execute the procedure 2 Valid
+EXEC user_loan_book(1, 1);
+SELECT Fu.fname, Fu.lname, Fl.*
+FROM Users Fu
+JOIN Loans Fl ON Fl.user_id = Fu.user_id
+WHERE Fl.user_id = 1;
+--- Execute the procedure 2 Invalid -- unavailable copies 
+EXEC user_loan_book(3, 3);
 
 
 --- EXPLAIN PLAN
